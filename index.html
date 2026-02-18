@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>選擇權百科 - 內容整合版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .submenu-enter { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .submenu-open { max-height: 800px; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .prose h2 { color: #1e3a8a; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; font-size: 1.5rem; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        const Icons = {
+            Home: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>,
+            Book: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>,
+            ChevronDown: () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>,
+            ChevronRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>,
+            Menu: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>,
+            ExternalLink: () => <svg className="w-3 h-3 ml-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+        };
+
+        const App = () => {
+            const [activeChapterId, setActiveChapterId] = useState('home');
+            const [activeSubIndex, setActiveSubIndex] = useState(null);
+            const [isMenuOpen, setIsMenuOpen] = useState(true);
+
+            const chapters = [
+                {
+                    id: 'ch1',
+                    title: '第一章：選擇權邏輯入門',
+                    icon: <Icons.Book />,
+                    subpages: [
+                        { 
+                            title: '1-1 什麼是選擇權？', 
+                            // 同目錄下的檔案連結法
+                            url: './1-1.html' 
+                        },
+                        { 
+                            title: '1-2 權利與義務', 
+                            url: './1-2.html' 
+                        }
+                    ]
+                },
+                { 
+                    id: 'ch2', 
+                    title: '第二章：核心名詞大解析', 
+                    icon: <Icons.Book />, 
+                    subpages: [
+                        { title: '2-1 履約價說明', url: './2-1.html' }
+                    ] 
+                }
+            ];
+
+            const currentChapter = chapters.find(c => c.id === activeChapterId);
+
+            return (
+                <div className="min-h-screen flex flex-col md:flex-row bg-gray-50">
+                    <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-white border-r transform transition-transform duration-300 ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
+                        <div className="h-full flex flex-col">
+                            <div className="p-8 flex items-center gap-3 cursor-pointer" onClick={() => {setActiveChapterId('home'); setActiveSubIndex(null);}}>
+                                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">Ω</div>
+                                <h2 className="text-xl font-black">選擇權百科</h2>
+                            </div>
+                            <nav className="flex-1 overflow-y-auto px-4 py-2">
+                                <button onClick={() => {setActiveChapterId('home'); setActiveSubIndex(null);}} className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-bold mb-4 ${activeChapterId === 'home' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>首頁</button>
+                                {chapters.map((ch, idx) => (
+                                    <div key={ch.id} className="mb-1">
+                                        <button onClick={() => {setActiveChapterId(ch.id); setActiveSubIndex(null);}} className={`w-full flex items-center justify-between px-3 py-3 rounded-xl text-sm ${activeChapterId === ch.id ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                            <div className="flex flex-col items-start leading-tight">
+                                                <span className="text-[10px] opacity-60">第 {idx + 1} 章</span>
+                                                <span className="truncate">{ch.title.split('：')[1]}</span>
+                                            </div>
+                                            <div className={`transition-transform ${activeChapterId === ch.id ? 'rotate-180 text-blue-600' : ''}`}><Icons.ChevronDown /></div>
+                                        </button>
+                                        <div className={`submenu-enter ${activeChapterId === ch.id ? 'submenu-open' : ''}`}>
+                                            <div className="pl-4 py-1 space-y-1 mt-1">
+                                                {ch.subpages.map((sub, sIdx) => (
+                                                    <button key={sIdx} onClick={() => {setActiveSubIndex(sIdx); if(window.innerWidth < 768) setIsMenuOpen(false);}} className={`w-full text-left py-2 px-3 rounded-lg text-xs font-bold ${activeChapterId === ch.id && activeSubIndex === sIdx ? 'bg-blue-600 text-white' : 'text-gray-500 hover:text-blue-600'}`}>
+                                                        {sub.title} {sub.url && <Icons.ExternalLink />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </nav>
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 h-screen overflow-y-auto relative">
+                        <header className="md:hidden flex justify-between items-center p-4 bg-white border-b sticky top-0 z-40 w-full shadow-sm">
+                            <span className="font-black text-gray-800">教學百科</span>
+                            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2"><Icons.Menu /></button>
+                        </header>
+
+                        <div className="p-6 md:p-12 max-w-5xl mx-auto h-full flex flex-col">
+                            {activeChapterId === 'home' ? (
+                                <div className="animate-fade-in bg-gradient-to-br from-indigo-700 to-blue-900 text-white p-12 rounded-3xl shadow-2xl">
+                                    <h1 className="text-4xl font-black mb-4 text-white">歡迎來到選擇權百科</h1>
+                                    <p>請選擇左側目錄開始閱讀。</p>
+                                </div>
+                            ) : (
+                                <div className="flex-1 flex flex-col animate-fade-in">
+                                    <div className="bg-white rounded-3xl shadow-xl border border-gray-100 flex-1 flex flex-col overflow-hidden">
+                                        {activeSubIndex === null ? (
+                                            <div className="p-12 text-center">
+                                                <h2 className="text-3xl font-black mb-4">{currentChapter.title}</h2>
+                                                <p className="text-gray-400">請從左側子目錄點擊具體節課...</p>
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1 flex flex-col">
+                                                {currentChapter.subpages[activeSubIndex].url ? (
+                                                    <iframe 
+                                                        src={currentChapter.subpages[activeSubIndex].url} 
+                                                        className="w-full flex-1 border-none"
+                                                        title="Content"
+                                                    ></iframe>
+                                                ) : (
+                                                    <div className="p-8 md:p-12 overflow-y-auto">
+                                                        <h2 className="text-3xl font-black mb-8 border-b pb-6">{currentChapter.subpages[activeSubIndex].title}</h2>
+                                                        <div 
+                                                            className="prose prose-blue max-w-none text-gray-700"
+                                                            dangerouslySetInnerHTML={{ __html: currentChapter.subpages[activeSubIndex].content || '<p>內容準備中...</p>' }}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

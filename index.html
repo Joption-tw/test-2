@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>歐大時間價值追蹤儀 - V4.0.0</title>
+    <title>歐大時間價值追蹤儀 - V4.0.1</title>
     
     <!-- 載入必要函式庫 (CDN) -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
@@ -24,15 +24,12 @@
             -webkit-tap-highlight-color: transparent;
         }
         
-        /* 自定義捲軸 */
         .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 20px; }
         
-        /* 拉桿樣式 - 優化觸控 */
         input[type=range] { -webkit-appearance: none; background: transparent; width: 100%; cursor: pointer; }
         
-        /* Y 軸拉桿：在手機上稍微縮短 */
         .y-slider { 
             transform: rotate(-90deg); 
             width: 180px; 
@@ -51,7 +48,6 @@
             border-radius: 10px; 
         }
 
-        /* 增大滑塊以利手機操作 */
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none; 
             height: 28px; 
@@ -66,7 +62,6 @@
         
         .recharts-legend-item-text { font-size: 18px !important; font-weight: 900 !important; color: #fff !important; }
         
-        /* 同步按鈕微發光 */
         .sync-btn-glow {
             box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
         }
@@ -86,7 +81,7 @@
         } = window.Recharts;
         const { useState, useEffect, useMemo } = React;
 
-        const APP_VERSION = "V4.0.0-RESPONSIVE";
+        const APP_VERSION = "V4.0.1-LABEL-FIX";
         const CSV_URL = "https://docs.google.com/spreadsheets/d/1AsY4_MJipaMp_cNLpyeXTpFGnG0FD4vWJu-SDRdvtME/export?format=csv&gid=710415505";
         const COLORS = {
             wed: "#38bdf8",
@@ -102,19 +97,35 @@
             const isMax = index === maxIndex;
             const isMin = index === minIndex;
             const isLatest = index === latestIndex;
+            
             if (!isLatest && !isMax && !isMin) return null;
 
             let labelPrefix = "";
-            if (isMax) labelPrefix = "最高: ";
-            else if (isMin) labelPrefix = "最低: ";
-            else if (isLatest) labelPrefix = "即時: ";
+            let textAnchor = "middle";
+            let offsetX = 0;
+
+            if (isMax) {
+                labelPrefix = "最高: ";
+            } else if (isMin) {
+                labelPrefix = "最低: ";
+            } else if (isLatest) {
+                labelPrefix = "即時: ";
+                // 關鍵修正：即時點位靠右對齊並向左移，避免超出格子
+                textAnchor = "end";
+                offsetX = -10; 
+            }
             
             return (
                 <text 
-                    x={x} y={y} dy={dy || -15} 
+                    x={x} 
+                    y={y} 
+                    dx={offsetX}
+                    dy={dy || -15} 
                     fill={labelColor} 
-                    fontSize={18} fontWeight="900" textAnchor="middle" 
-                    style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.95))' }}
+                    fontSize={18} 
+                    fontWeight="900" 
+                    textAnchor={textAnchor}
+                    style={{ filter: 'drop-shadow(0px 2px 5px rgba(0,0,0,1))' }}
                     className="pointer-events-none"
                 >
                     {labelPrefix + value}
@@ -266,30 +277,23 @@
                 }
             }, [baseFilteredData.length, stats]);
 
-            if (loading) return (
-                <div className="min-h-screen flex flex-col items-center justify-center text-white bg-slate-950 font-sans p-4 text-center">
-                    <div className="w-12 h-12 border-4 border-slate-700 border-t-sky-400 rounded-full animate-spin mb-6"></div>
-                    <p className="text-[18px] font-black tracking-widest animate-pulse font-mono uppercase">響應式佈署中 V4.0.0...</p>
-                </div>
-            );
-
             return (
                 <div className="min-h-screen text-slate-100 p-3 md:p-6 font-sans">
                     <div className="max-w-[1600px] mx-auto space-y-4 md:space-y-6">
                         
-                        {/* Header Section: 電腦並列, 手機垂直 */}
+                        {/* Header Section */}
                         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2 md:px-4 py-4 md:py-6 border-b border-slate-800/50">
                             <div className="text-center md:text-left">
-                                <div className="flex items-center justify-center md:justify-start gap-3 mb-2 text-sky-400 font-bold">
-                                    <i data-lucide="smartphone" className="w-5 h-5 opacity-70"></i>
-                                    <span className="text-[14px] uppercase tracking-widest italic opacity-50">Cross-Platform V4.0</span>
+                                <div className="flex items-center justify-center md:justify-start gap-3 mb-2 text-sky-400 font-bold text-[14px]">
+                                    <i data-lucide="layout-template" className="w-5 h-5 opacity-70"></i>
+                                    <span className="uppercase tracking-widest italic opacity-50">Label Optimization V4.0.1</span>
                                 </div>
                                 <h1 className="text-3xl lg:text-5xl font-black tracking-tighter bg-gradient-to-br from-white via-white to-slate-500 bg-clip-text text-transparent">
                                     歐大時間價值追蹤儀
                                 </h1>
                             </div>
                             
-                            {/* 功能按鈕組：手機全寬 */}
+                            {/* 功能按鈕組 */}
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                                 <button 
                                     onClick={fetchData}
@@ -309,7 +313,7 @@
                             <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] md:rounded-[2.5rem] p-3 md:p-8 shadow-2xl relative">
                                 <div className="flex gap-2 md:gap-4">
                                     
-                                    {/* Y 軸拉桿：手機上更窄 */}
+                                    {/* Y 軸拉桿 */}
                                     <div className="flex flex-col items-center justify-between py-6 md:py-8 w-12 md:w-16 bg-slate-950/80 rounded-xl md:rounded-2xl border border-slate-700 shadow-inner relative overflow-hidden">
                                         <i data-lucide="maximize-2" className="text-rose-400 w-4 h-4 md:w-5 md:h-5"></i>
                                         <div className="h-40 md:h-48 relative flex items-center justify-center w-full">
@@ -323,8 +327,8 @@
                                         <i data-lucide="minimize-2" className="text-amber-400 w-4 h-4 md:w-5 md:h-5"></i>
                                     </div>
 
-                                    {/* 中央圖表區域：響應高度 */}
-                                    <div className="flex-1 h-[400px] md:h-[650px] relative overflow-hidden">
+                                    {/* 中央圖表區域 */}
+                                    <div className="flex-1 h-[450px] md:h-[650px] relative overflow-hidden">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <AreaChart data={displayData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }}>
                                                 <defs>
@@ -363,7 +367,7 @@
                                     </div>
                                 </div>
 
-                                {/* X 軸縮放：手機上點擊範圍更大 */}
+                                {/* X 軸縮放 */}
                                 <div className="mt-6 px-3 md:px-6 py-4 bg-slate-950/80 rounded-xl md:rounded-2xl border border-slate-700 shadow-inner">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                                         <div className="flex items-center gap-3">
@@ -389,7 +393,7 @@
                         </div>
                         
                         <div className="pt-8 pb-10 text-center text-slate-600 text-[14px] font-mono uppercase tracking-widest italic opacity-40">
-                            Optimized for Desktop & Mobile Interaction
+                            Optimized Viewport & Bound-Safe Labels
                         </div>
                     </div>
                 </div>

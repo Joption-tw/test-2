@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>歐大時間價值追蹤儀 - V4.0.1</title>
+    <title>歐大時間價值追蹤儀 - V4.0.5</title>
     
     <!-- 載入必要函式庫 (CDN) -->
     <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
@@ -13,6 +13,11 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Firebase SDK (相容模式) -->
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
 
     <style>
         body { 
@@ -58,7 +63,6 @@
             box-shadow: 0 0 15px rgba(0,0,0,0.6); 
             transition: transform 0.1s ease;
         }
-        input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); }
         
         .recharts-legend-item-text { font-size: 18px !important; font-weight: 900 !important; color: #fff !important; }
         
@@ -68,6 +72,11 @@
         .sync-btn-glow:hover {
             box-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
             background-color: rgba(56, 189, 248, 0.15);
+        }
+
+        .visit-counter-glow {
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
+            border-top: 1px solid rgba(56, 189, 248, 0.2);
         }
     </style>
 </head>
@@ -81,7 +90,7 @@
         } = window.Recharts;
         const { useState, useEffect, useMemo } = React;
 
-        const APP_VERSION = "V4.0.1-LABEL-FIX";
+        const APP_VERSION = "V4.0.5-ZERO-FILTER";
         const CSV_URL = "https://docs.google.com/spreadsheets/d/1AsY4_MJipaMp_cNLpyeXTpFGnG0FD4vWJu-SDRdvtME/export?format=csv&gid=710415505";
         const COLORS = {
             wed: "#38bdf8",
@@ -92,6 +101,24 @@
             labelYellow: "#facc15"
         };
 
+        // Firebase 初始化
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyCmqmGIBfUv_UVJU80AB_iUpE_yLLX-dAw",
+            authDomain: "mistake-notebook-caca8.firebaseapp.com",
+            projectId: "mistake-notebook-caca8",
+            storageBucket: "mistake-notebook-caca8.firebasestorage.app",
+            messagingSenderId: "298098777699",
+            appId: "1:298098777699:web:4590aecebc2293bab9e256",
+            measurementId: "G-6S5QWYKT7M"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'mistake-notebook-caca8';
+
         const CustomizedLabel = (props) => {
             const { x, y, value, index, maxIndex, minIndex, latestIndex, dy, labelColor } = props;
             const isMax = index === maxIndex;
@@ -99,6 +126,8 @@
             const isLatest = index === latestIndex;
             
             if (!isLatest && !isMax && !isMin) return null;
+            // 如果數值為 0，則不顯示標籤
+            if (value === 0 || value === null) return null;
 
             let labelPrefix = "";
             let textAnchor = "middle";
@@ -110,7 +139,6 @@
                 labelPrefix = "最低: ";
             } else if (isLatest) {
                 labelPrefix = "即時: ";
-                // 關鍵修正：即時點位靠右對齊並向左移，避免超出格子
                 textAnchor = "end";
                 offsetX = -10; 
             }
@@ -140,6 +168,9 @@
             const [yRange, setYRange] = useState({ min: 0, max: 20000 });
             const [yLimit, setYLimit] = useState({ min: 0, max: 40000 });
             const [xRange, setXRange] = useState([0, 100]);
+
+            const [user, setUser] = useState(null);
+            const [visitStats, setVisitStats] = useState({ total: 0, today: 0 });
 
             const parseCSVLine = (text) => {
                 const result = [];
@@ -182,7 +213,15 @@
                     const parsed = lines.slice(1, 2851).map(function(line, index) {
                         const row = parseCSVLine(line);
                         if (row.length < 5) return null;
-                        const cleanVal = (v) => (!v || v.trim() === "") ? null : parseFloat(v.replace(/,/g, '').replace(/[^0-9.-]/g, ''));
+                        
+                        const cleanVal = (v) => {
+                            if (!v || v.trim() === "") return null;
+                            const num = parseFloat(v.replace(/,/g, '').replace(/[^0-9.-]/g, ''));
+                            // 修改：若數值為 0，則視為 null (不顯示於圖表與標籤)
+                            if (isNaN(num) || num === 0) return null;
+                            return num;
+                        };
+
                         const extract = (idx) => {
                             const raw = row[idx] || "";
                             const full = raw.replace(/"/g, '').trim();
@@ -203,9 +242,58 @@
                         };
                     }).filter(Boolean);
                     setRawData(parsed);
-                } catch (err) { console.error(err); }
+                } catch (err) { console.error("CSV Fetch Error:", err); }
                 finally { setLoading(false); }
             };
+
+            useEffect(() => {
+                const initAuth = async () => {
+                    try {
+                        const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                        if (token) {
+                            await auth.signInWithCustomToken(token);
+                        } else {
+                            await auth.signInAnonymously();
+                        }
+                    } catch (e) {
+                        console.error("Firebase Auth Error:", e);
+                    }
+                };
+                initAuth();
+                const unsubscribe = auth.onAuthStateChanged(setUser);
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const todayStr = new Date().toISOString().split('T')[0];
+                const statsDocRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('visitor_stats').doc('counters');
+
+                const syncStats = async () => {
+                    try {
+                        await statsDocRef.set({
+                            total: firebase.firestore.FieldValue.increment(1),
+                            dates: {
+                                [todayStr]: firebase.firestore.FieldValue.increment(1)
+                            }
+                        }, { merge: true });
+                    } catch (e) {}
+                };
+
+                syncStats();
+
+                const unsubscribe = statsDocRef.onSnapshot((doc) => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        setVisitStats({
+                            total: data.total || 0,
+                            today: (data.dates && data.dates[todayStr]) || 0
+                        });
+                    }
+                }, (err) => console.error("Snapshot error:", err));
+
+                return () => unsubscribe();
+            }, [user]);
 
             useEffect(() => { fetchData(); }, []);
             useEffect(() => { if (!loading && typeof lucide !== 'undefined') lucide.createIcons(); }, [loading, selectedTradingDate]);
@@ -251,6 +339,7 @@
             const stats = useMemo(() => {
                 if (displayData.length === 0) return null;
                 const getStats = (key) => {
+                    // 已過濾 0 值
                     const validEntries = displayData.filter(d => d[key] !== null && d[key] > 0);
                     if (validEntries.length === 0) return null;
                     const vals = validEntries.map(d => d[key]);
@@ -278,31 +367,24 @@
             }, [baseFilteredData.length, stats]);
 
             return (
-                <div className="min-h-screen text-slate-100 p-3 md:p-6 font-sans">
-                    <div className="max-w-[1600px] mx-auto space-y-4 md:space-y-6">
-                        
-                        {/* Header Section */}
+                <div className="min-h-screen text-slate-100 p-3 md:p-6 font-sans flex flex-col">
+                    <div className="max-w-[1600px] mx-auto space-y-4 md:space-y-6 flex-1 w-full">
                         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 px-2 md:px-4 py-4 md:py-6 border-b border-slate-800/50">
                             <div className="text-center md:text-left">
                                 <div className="flex items-center justify-center md:justify-start gap-3 mb-2 text-sky-400 font-bold text-[14px]">
-                                    <i data-lucide="layout-template" className="w-5 h-5 opacity-70"></i>
-                                    <span className="uppercase tracking-widest italic opacity-50">Label Optimization V4.0.1</span>
+                                    <i data-lucide="filter-x" className="w-5 h-5 opacity-70"></i>
+                                    <span className="uppercase tracking-widest italic opacity-50">Zero-Value Filtered V4.0.5</span>
                                 </div>
                                 <h1 className="text-3xl lg:text-5xl font-black tracking-tighter bg-gradient-to-br from-white via-white to-slate-500 bg-clip-text text-transparent">
                                     歐大時間價值追蹤儀
                                 </h1>
                             </div>
                             
-                            {/* 功能按鈕組 */}
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                                <button 
-                                    onClick={fetchData}
-                                    className="sync-btn-glow flex items-center justify-center gap-3 bg-sky-600/10 border border-sky-500/50 px-6 py-3 rounded-2xl group transition-all active:scale-[0.96]"
-                                >
+                                <button onClick={fetchData} className="sync-btn-glow flex items-center justify-center gap-3 bg-sky-600/10 border border-sky-500/50 px-6 py-3 rounded-2xl group transition-all active:scale-[0.96]">
                                     <i data-lucide="refresh-cw" className="w-5 h-5 text-sky-400 group-hover:rotate-180 transition-transform duration-700"></i>
                                     <span className="text-[18px] font-black text-sky-400 tracking-tighter">同步數據</span>
                                 </button>
-                                
                                 <div className="flex items-center justify-center text-slate-300 text-[18px] font-mono bg-slate-900 border border-slate-700 px-6 py-3 rounded-2xl shadow-lg ring-1 ring-white/5">
                                     目前盤勢: <span className="text-sky-400 font-black ml-2 tracking-tighter">{selectedTradingDate || '--'}</span>
                                 </div>
@@ -312,8 +394,6 @@
                         <div className="space-y-6">
                             <div className="bg-slate-900 border border-slate-800 rounded-[1.5rem] md:rounded-[2.5rem] p-3 md:p-8 shadow-2xl relative">
                                 <div className="flex gap-2 md:gap-4">
-                                    
-                                    {/* Y 軸拉桿 */}
                                     <div className="flex flex-col items-center justify-between py-6 md:py-8 w-12 md:w-16 bg-slate-950/80 rounded-xl md:rounded-2xl border border-slate-700 shadow-inner relative overflow-hidden">
                                         <i data-lucide="maximize-2" className="text-rose-400 w-4 h-4 md:w-5 md:h-5"></i>
                                         <div className="h-40 md:h-48 relative flex items-center justify-center w-full">
@@ -327,7 +407,6 @@
                                         <i data-lucide="minimize-2" className="text-amber-400 w-4 h-4 md:w-5 md:h-5"></i>
                                     </div>
 
-                                    {/* 中央圖表區域 */}
                                     <div className="flex-1 h-[450px] md:h-[650px] relative overflow-hidden">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <AreaChart data={displayData} margin={{ top: 40, right: 10, left: 0, bottom: 0 }}>
@@ -352,22 +431,13 @@
                                                     return null;
                                                 }} />
                                                 <Legend verticalAlign="top" height={40} />
-                                                <Area 
-                                                    name="週三選" type="monotone" dataKey="wedValue" stroke={COLORS.wed} strokeWidth={3} fill="url(#colorWed)" 
-                                                    dot={false} connectNulls={false} activeDot={{ r: 6, fill: COLORS.wed, stroke: '#fff', strokeWidth: 2 }} 
-                                                    label={<CustomizedLabel dy={-15} maxIndex={stats?.wed?.maxIdx} minIndex={stats?.wed?.minIndex} latestIndex={stats?.wed?.latestIndex} labelColor={COLORS.labelYellow} />} 
-                                                />
-                                                <Area 
-                                                    name="週五選" type="monotone" dataKey="friValue" stroke={COLORS.fri} strokeWidth={3} fill="url(#colorFri)" 
-                                                    dot={false} connectNulls={false} activeDot={{ r: 6, fill: COLORS.fri, stroke: '#fff', strokeWidth: 2 }} 
-                                                    label={<CustomizedLabel dy={25} maxIndex={stats?.fri?.maxIdx} minIndex={stats?.fri?.minIndex} latestIndex={stats?.fri?.latestIndex} labelColor={COLORS.labelRed} />} 
-                                                />
+                                                <Area name="週三選" type="monotone" dataKey="wedValue" stroke={COLORS.wed} strokeWidth={3} fill="url(#colorWed)" dot={false} connectNulls={false} activeDot={{ r: 6, fill: COLORS.wed, stroke: '#fff', strokeWidth: 2 }} label={<CustomizedLabel dy={-15} maxIndex={stats?.wed?.maxIdx} minIndex={stats?.wed?.minIndex} latestIndex={stats?.wed?.latestIndex} labelColor={COLORS.labelYellow} />} />
+                                                <Area name="週五選" type="monotone" dataKey="friValue" stroke={COLORS.fri} strokeWidth={3} fill="url(#colorFri)" dot={false} connectNulls={false} activeDot={{ r: 6, fill: COLORS.fri, stroke: '#fff', strokeWidth: 2 }} label={<CustomizedLabel dy={25} maxIndex={stats?.fri?.maxIdx} minIndex={stats?.fri?.minIndex} latestIndex={stats?.fri?.latestIndex} labelColor={COLORS.labelRed} />} />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     </div>
                                 </div>
 
-                                {/* X 軸縮放 */}
                                 <div className="mt-6 px-3 md:px-6 py-4 bg-slate-950/80 rounded-xl md:rounded-2xl border border-slate-700 shadow-inner">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2">
                                         <div className="flex items-center gap-3">
@@ -391,11 +461,30 @@
                                 </div>
                             </div>
                         </div>
-                        
-                        <div className="pt-8 pb-10 text-center text-slate-600 text-[14px] font-mono uppercase tracking-widest italic opacity-40">
-                            Optimized Viewport & Bound-Safe Labels
-                        </div>
                     </div>
+
+                    <footer className="mt-10 mb-10 visit-counter-glow bg-slate-900/40 py-8 px-6 backdrop-blur-md">
+                        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row items-center justify-center gap-8 md:gap-20">
+                            <div className="flex items-center gap-4 group">
+                                <div className="bg-sky-500/20 p-3 rounded-2xl border border-sky-500/30">
+                                    <i data-lucide="users" className="w-6 h-6 text-sky-400"></i>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[14px] font-black text-slate-500 uppercase tracking-widest">今日人次</span>
+                                    <span className="text-[22px] font-mono font-black text-sky-400 tabular-nums">{visitStats.today.toLocaleString()}</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4 group">
+                                <div className="bg-emerald-500/20 p-3 rounded-2xl border border-emerald-500/30">
+                                    <i data-lucide="trending-up" className="w-6 h-6 text-emerald-400"></i>
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[14px] font-black text-slate-500 uppercase tracking-widest">累積人次</span>
+                                    <span className="text-[22px] font-mono font-black text-emerald-400 tabular-nums">{visitStats.total.toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </footer>
                 </div>
             );
         };
